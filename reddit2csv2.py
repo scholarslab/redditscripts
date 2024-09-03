@@ -6,17 +6,17 @@ then outputs select fields in CSV format.
 
 Submissions and comments are in chronological order.
 
-Finds and outputs matching submissions and all comments belonging
-to matching submissions, ignores matching comments to non-matching
-submissions. Most useful for structured analysis when the keywords
-do a good job of identifying relevant submissions.
+Outputs matches in submissions and comments independently
+(i.e. comments matches can be replies to submissions that don't
+match; won't fetch non-matching comments for submissions that do)
+so this is most useful for unstructured analysis.
 """
 
 REDDITS = ["breastcancer"]
 KEYWORDS = ["flat", "aesthetic closure", "goldilocks", "goldilock"]
 
 SUBMISSION_COLUMNS = ["subreddit","type","title","author","score","selftext","url","id","permalink","created_utc","date"]
-COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","parent_id","submission_id","permalink","created_utc","date"]
+COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","permalink","created_utc","date"]
 
 # Reddit API notes
 # 'score' is the total score ('ups' - 'downs') of a post. 'ups' and
@@ -29,18 +29,6 @@ COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","parent_id","
 # different types over time and some (e.g. permalinks) may not exist
 # at all.
 
-# Reddit Thing Fullnames (from the Reddit API docs)
-# "A fullname is a combination of a thing's type (e.g. Link) and its unique ID which forms a compact encoding of a globally unique ID on reddit.
-#  Fullnames start with the type prefix for the object's type, followed by the thing's unique ID in base 36. For example, t3_15bfi0."
-
-# type  prefixes
-# t1_	Comment
-# t2_	Account
-# t3_	Link (and submissions??)
-# t4_	Message
-# t5_	Subreddit
-# t6_	Award
-
 SAMPLE = False
 
 import json
@@ -48,20 +36,7 @@ import csv
 from datetime import datetime 
 import re, string
 
-def get_submission(j, comments):
-    parent_ids = []
-    while 1:
-        if j["parent_id"][0:3] == "t3_":
-            return j["parent_id"]
-        parent_ids.append(j["parent_id"])
-        if j["parent_id"] in comments.keys():
-            j = comments[j["parent_id"]]
-        else:
-            return None
-    
-
 cleanup_pattern = re.compile(r'[\W_]+')
-submission_ids = {}
 for reddit in REDDITS:
     if SAMPLE:
         submissions_filename = reddit+"_submissions_sample"
@@ -82,13 +57,12 @@ for reddit in REDDITS:
                 submission["score"] = j["score"]
                 submission["selftext"] = j["selftext"]
                 submission["url"] = j["url"]
-                submission["id"] = "t3_"+j["id"]
+                submission["id"] = j["id"]
                 submission["permalink"] = j["permalink"]
                 submission["created_utc"] = j["created_utc"]
                 submission["date"] = datetime.fromtimestamp(int(j["created_utc"])).strftime('%Y-%m-%d')
                 submissions.append(submission)
             continue
-        submission_ids[reddit] = [submission["id"] for submission in submissions]
     with open("./output/"+reddit+"_submissions"+".csv","w",encoding="UTF-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=SUBMISSION_COLUMNS)
         writer.writeheader()
@@ -100,22 +74,18 @@ for reddit in REDDITS:
     else:
         comments_filename = reddit+"_comments"
     with open(comments_filename,"r", encoding="UTF-8") as comments_file:
-        comments = {}
+        comments = []
         for line in comments_file:
             j = json.loads(line)
             body = " "+cleanup_pattern.sub(' ', j["body"].lower())+" "
-            # This only works because the comments are in chronological order
-            # and children cannot come before parents!
-            if j["parent_id"] in submission_ids[reddit] or j["parent_id"] in comments.keys():
+            if any([" "+keyword+" " in body for keyword in KEYWORDS]):
                 comment = {}
                 comment["subreddit"] = j["subreddit"]
                 comment["type"] = "comment"
                 comment["author"] = j["author"]
                 comment["score"] = j["score"]
                 comment["body"] = j["body"]
-                comment["id"] = "t1_"+j["id"]
-                comment["parent_id"] = j["parent_id"]
-                comment["submission_id"] = get_submission(j,comments)
+                comment["id"] = j["id"]
                 if "permalink" in j:
                     comment["permalink"] = j["permalink"]
                 else:
@@ -123,10 +93,10 @@ for reddit in REDDITS:
                     comment["permalink"] = "NONE"
                 comment["created_utc"] = j["created_utc"]
                 comment["date"] = datetime.fromtimestamp(int(j["created_utc"])).strftime('%Y-%m-%d')
-                comments[comment["id"]] = comment
+                comments.append(comment)
             continue
         with open("./output/"+reddit+"_comments"+".csv","w",encoding="UTF-8") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=COMMENT_COLUMNS)
             writer.writeheader()
             for comment in comments:
-                writer.writerow(comments[comment])
+                writer.writerow(comment)
