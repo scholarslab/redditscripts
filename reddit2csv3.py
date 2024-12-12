@@ -14,6 +14,8 @@ KEYWORDS = ["flat", "aesthetic closure", "goldilocks", "goldilock"]
 SUBMISSION_COLUMNS = ["subreddit","type","title","author","score","selftext","url","id","permalink","created_utc","date"]
 COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","permalink","created_utc","date"]
 
+CUSTOM_STOPWORDS = KEYWORDS+["breast", "breasts", "cancer","chest","surgeon","surgery","closure","procedure", "goldilock", "reconstruction","mastectomy","boobs","boobies","boob","implant","implants"]
+
 # Reddit API notes
 # 'score' is the total score ('ups' - 'downs') of a post. 'ups' and
 #     downs' are deprecated - 'ups' is always the same as 'score' and
@@ -32,6 +34,8 @@ import csv
 from datetime import datetime 
 from collections import defaultdict
 from nltk.tokenize import word_tokenize
+import nltk
+from nltk.corpus import stopwords
 import re, string
 
 cleanup_pattern = re.compile(r'[\W_]+')
@@ -63,12 +67,15 @@ for reddit in REDDITS:
                 submissions.append(submission)
             continue
     
-    textbydate = defaultdict(str)
+    textbymonth = defaultdict(str)
+    wordsbymonth = defaultdict(list)
+
     for submission in submissions:
         words = re.findall(r'\w+', submission["title"]+" "+submission["selftext"])
         # words = word_tokenize(submission["title"]+" "+submission["selftext"])
+        wordsbymonth[submission["month"]].extend(words)
         words.append(" ")
-        textbydate[submission["month"]]+=" ".join(words)
+        textbymonth[submission["month"]]+=" ".join(words)
 
     if SAMPLE:
         comments_filename = reddit+"_comments_sample"
@@ -100,10 +107,17 @@ for reddit in REDDITS:
     for comment in comments:
         words = re.findall(r'\w+', comment["body"])
         # words = word_tokenize(submission["title"]+" "+submission["selftext"])
+        wordsbymonth[comment["month"]].extend(words)
         words.append(" ")
-        textbydate[comment["month"]]+=" ".join(words)
+        textbymonth[comment["month"]]+=" ".join(words)
 
-for key in textbydate.keys():    
+wordcount = sum([len(y) for x,y in wordsbymonth.items()])
+for month,words in wordsbymonth.items():
+    filtered_words = [w.lower() for w in words if not w.lower() in stopwords.words() and not w.lower() in CUSTOM_STOPWORDS]
+    frequency = nltk.FreqDist(filtered_words)
+    with open("./output/monthly/freq/"+reddit+"_"+month+".csv","w",encoding="UTF-8") as outfile:
+        outfile.writelines([word + ", " + str(count) + "\n" for word,count in frequency.most_common(20)])
+
+for key in textbymonth.keys():    
     with open("./output/monthly/"+reddit+"_"+key+".txt","w",encoding="UTF-8") as outfile:
-        outfile.write(textbydate[key])
-
+        outfile.write(textbymonth[key])
