@@ -17,7 +17,9 @@ KEYWORDS = [" aesthetic closure", " goldilock", " explant", " flat chest", " aes
 
 
 SUBMISSION_COLUMNS = ["subreddit","type","title","author","score","selftext","url","id","permalink","created_utc","date"]
-COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","parent_id","submission_id","permalink","created_utc","date"]
+COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","parent_id","submission_id","submission_title","permalink","created_utc","date"]
+
+SAMPLE = False
 
 # Reddit API notes
 # 'score' is the total score ('ups' - 'downs') of a post. 'ups' and
@@ -42,12 +44,13 @@ COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","parent_id","
 # t5_	Subreddit
 # t6_	Award
 
-SAMPLE = False
+
 
 import json
 import csv
 from datetime import datetime 
 import re, string
+from collections import defaultdict
 
 def get_submission(j, comments):
     parent_ids = []
@@ -69,7 +72,7 @@ for reddit in REDDITS:
     else:
         submissions_filename = reddit+"_submissions"
     with open(submissions_filename,"r", encoding="UTF-8") as submissions_file:
-        submissions = []
+        submissions = {}
         for line in submissions_file:
             j = json.loads(line)
             title = " "+cleanup_pattern.sub(' ', j["title"].lower())+" "
@@ -84,16 +87,16 @@ for reddit in REDDITS:
                 submission["selftext"] = j["selftext"]
                 submission["url"] = j["url"]
                 submission["id"] = "t3_"+j["id"]
-                submission["permalink"] = j["permalink"]
+                submission["permalink"] = "https://www.reddit.com"+j["permalink"]
                 submission["created_utc"] = j["created_utc"]
                 submission["date"] = datetime.fromtimestamp(int(j["created_utc"])).strftime('%Y-%m-%d')
-                submissions.append(submission)
+                submissions[submission["id"]] = submission
             continue
-        submission_ids[reddit] = [submission["id"] for submission in submissions]
+        submission_ids[reddit] = [submission["id"] for submission in submissions.values()]
     with open("./output/"+reddit+"_submissions"+".csv","w",encoding="UTF-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=SUBMISSION_COLUMNS)
         writer.writeheader()
-        for submission in submissions:
+        for submission in submissions.values():
             writer.writerow(submission)
 
     if SAMPLE:
@@ -102,6 +105,7 @@ for reddit in REDDITS:
         comments_filename = reddit+"_comments"
     with open(comments_filename,"r", encoding="UTF-8") as comments_file:
         comments = {}
+        comments_by_thread = defaultdict(list)
         for line in comments_file:
             j = json.loads(line)
             body = " "+cleanup_pattern.sub(' ', j["body"].lower())+" "
@@ -117,17 +121,20 @@ for reddit in REDDITS:
                 comment["id"] = "t1_"+j["id"]
                 comment["parent_id"] = j["parent_id"]
                 comment["submission_id"] = get_submission(j,comments)
+                comment["submission_title"] = submissions[get_submission(j,comments)]["title"]
                 if "permalink" in j:
-                    comment["permalink"] = j["permalink"]
+                    comment["permalink"] = "https://www.reddit.com"+j["permalink"]
                 else:
                     # sometimes (maybe because of older API versions) there aren't permalinks
                     comment["permalink"] = "NONE"
                 comment["created_utc"] = j["created_utc"]
                 comment["date"] = datetime.fromtimestamp(int(j["created_utc"])).strftime('%Y-%m-%d')
                 comments[comment["id"]] = comment
+                comments_by_thread[comment["parent_id"]].append(comment)
             continue
         with open("./output/"+reddit+"_comments"+".csv","w",encoding="UTF-8") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=COMMENT_COLUMNS)
             writer.writeheader()
-            for comment in comments:
-                writer.writerow(comments[comment])
+            for thread_id in comments_by_thread:
+                for comment in comments_by_thread[thread_id]:
+                    writer.writerow(comment)
