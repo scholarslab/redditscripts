@@ -13,7 +13,8 @@ do a good job of identifying relevant submissions.
 """
 
 REDDITS = ["breastcancer"]
-KEYWORDS = ["flat", "aesthetic closure", "goldilocks", "goldilock"]
+KEYWORDS = [" aesthetic closure", " goldilock", " explant", " flat chest", " aesthetic flat ", " be flat ", " being flat ", " is flat ", " are flat ", " i am flat ", " i'm flat ", " was flat ", " go flat ", " going flat ", " went flat ", " stay flat ", " staying flat ", " stayed flat ", " flat ambassador ", " flat closure ", " flatties ", " years flat ", " year flat ", " remove the implant"," removed the implant", " removing the implant", " remove my implant", " removed my implant", " removing my implant", " post-explant "]
+
 
 SUBMISSION_COLUMNS = ["subreddit","type","title","author","score","selftext","url","id","permalink","created_utc","date"]
 COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","parent_id","submission_id","permalink","created_utc","date"]
@@ -73,7 +74,7 @@ for reddit in REDDITS:
             j = json.loads(line)
             title = " "+cleanup_pattern.sub(' ', j["title"].lower())+" "
             selftext = " "+cleanup_pattern.sub(' ', j["selftext"].lower())+" "
-            if any([(" "+keyword+" " in selftext or " "+keyword+" " in title) for keyword in KEYWORDS]):
+            if any([(keyword in selftext or keyword in title) for keyword in KEYWORDS]):
                 submission = {}
                 submission["subreddit"] = j["subreddit"]
                 submission["type"] = "submission"

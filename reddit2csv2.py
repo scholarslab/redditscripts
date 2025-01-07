@@ -13,7 +13,7 @@ so this is most useful for unstructured analysis.
 """
 
 REDDITS = ["breastcancer"]
-KEYWORDS = ["flat", "aesthetic closure", "goldilocks", "goldilock"]
+KEYWORDS = ["flat", "aesthetic closure", "aesthetic closures", "goldilocks", "goldilock", "explant", "explants"]
 
 SUBMISSION_COLUMNS = ["subreddit","type","title","author","score","selftext","url","id","permalink","created_utc","date"]
 COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","permalink","created_utc","date"]
