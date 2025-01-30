@@ -4,9 +4,8 @@ A quick and dirty script to parse Reddit dumps
 Reads in submission and comment jsonl files, scans for keywords,
 then outputs select fields in CSV format.
 
-Outputs body and header as text blobs per month, based on the UTC
-month that each submission and comment were posted. Also outputs
-20 most frequent words every month, with counts and frequencies.
+Output 100 most frequent words for entire corpus, with counts and
+frequencies. Output monthly frequency for those 100 words.
 """
 
 REDDITS = ["breastcancer"]
@@ -15,7 +14,8 @@ KEYWORDS = [" aesthetic closure", " goldilock", " explant", " flat chest", " aes
 SUBMISSION_COLUMNS = ["subreddit","type","title","author","score","selftext","url","id","permalink","created_utc","date"]
 COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","parent_id","submission_id","submission_title","permalink","created_utc","date"]
 
-CUSTOM_STOPWORDS = KEYWORDS+["breast", "breasts", "cancer","chest","surgeon","surgery","closure","procedure", "reconstruction","mastectomy","boobs","boobies","boob","implant","implants"]
+# CUSTOM_STOPWORDS = " ".join(KEYWORDS).split()+["breast", "breasts", "cancer","chest","surgeon","surgery","closure","procedure", "reconstruction","mastectomy","boobs","boobies","boob","implant","implants"]+[str(n) for n in range(0,11)]
+CUSTOM_STOPWORDS = " ".join(KEYWORDS).split()+["breast", "breasts", "cancer"]+[str(n) for n in range(0,11)]
 
 # Reddit API notes
 # 'score' is the total score ('ups' - 'downs') of a post. 'ups' and
@@ -79,22 +79,42 @@ for reddit in REDDITS:
         words.append(" ")
         textbymonth[month]+=" ".join(words)
 
-wordcount = sum([len(y) for x,y in wordsbymonth.items()])
+# figure out total corpus freqs
+corpus_words = []
 for month,words in wordsbymonth.items():
-    filtered_words = [w.lower() for w in words if not w.lower() in stopwords.words() and not w.lower() in CUSTOM_STOPWORDS]
-    # only filter out nltk basic stopwords and not custom stopwords for ngrams
-    unfiltered_words = [w.lower() for w in words if not w.lower() in stopwords.words()]
-    frequency = nltk.FreqDist(filtered_words)
-    with open("./output/monthly/freq/"+reddit+"_"+month+".csv","w",encoding="UTF-8") as outfile:
-        outfile.writelines([word + ", " + str(count) + "\n" for word,count in frequency.most_common(20)])
-    bigrams = nltk.FreqDist(list(nltk.bigrams(unfiltered_words)))
-    with open("./output/monthly/bigrams/"+reddit+"_"+month+"_bigrams.csv", "w", encoding="UTF-8") as outfile:
-        outfile.writelines([" ".join(bigram) + ", " + str(count) + "\n" for bigram,count in bigrams.most_common(20)])
-    trigrams = nltk.FreqDist(list(nltk.trigrams(unfiltered_words)))
-    with open("./output/monthly/trigrams/"+reddit+"_"+month+"_trigrams.csv", "w", encoding="UTF-8") as outfile:
-        outfile.writelines([" ".join(trigram) + ", " + str(count) + "\n" for trigram,count in trigrams.most_common(20)])
-    
+    filtered_words = [w.lower() for w in words if not w.lower() in STOPWORDS]
+    corpus_words.extend(filtered_words)
 
-for key in textbymonth.keys():
-    with open("./output/monthly/"+reddit+"_"+key+".txt","w",encoding="UTF-8") as outfile:
-        outfile.write(textbymonth[key])
+corpus_frequency = nltk.FreqDist(corpus_words)
+with open("./output/freq-over-time/"+reddit+"_corpus_freq.csv","w",encoding="UTF-8") as outfile:
+    outfile.writelines([word + ", " + str(count) + ", " + str(round(count/len(corpus_words),7)) + "\n" for word,count in corpus_frequency.most_common(100)])
+
+with open("./output/freq-over-time/"+reddit+"_monthly_freq.csv","w",encoding="UTF-8") as outfile:
+    freq_words = [word for word,count in corpus_frequency.most_common(20)]
+    outfile.write("month,"+",".join(freq_words)+"\n")
+    for month,words in wordsbymonth.items():
+        filtered_words = [w.lower() for w in words if not w.lower() in STOPWORDS]
+        word_count = len(filtered_words)
+        freqs = [month]
+        freqs.extend([str(round(filtered_words.count(freq_word)/word_count,7)) for freq_word in freq_words])
+        outfile.write(",".join(freqs)+"\n")
+
+with open("./output/freq-over-time/"+reddit+"_monthly_count.csv","w",encoding="UTF-8") as outfile:
+    freq_words = [word for word,count in corpus_frequency.most_common(20)]
+    outfile.write("[month],[total words],"+",".join(freq_words)+"\n")
+    for month,words in wordsbymonth.items():
+        filtered_words = [w.lower() for w in words if not w.lower() in STOPWORDS]
+        word_count = len(filtered_words)
+        freqs = [month, str(word_count)]
+        freqs.extend([str(filtered_words.count(freq_word)) for freq_word in freq_words])
+        outfile.write(",".join(freqs)+"\n")
+
+# for month,words in wordsbymonth.items():
+#     filtered_words = [w.lower() for w in words if not w.lower() in stopwords.words() and not w.lower() in CUSTOM_STOPWORDS]
+#     frequency = nltk.FreqDist(filtered_words)
+#     with open("./output/monthly/freq/"+reddit+"_"+month+".csv","w",encoding="UTF-8") as outfile:
+#         outfile.writelines([word + ", " + str(count) + ", " + str(round(count/len(filtered_words),5)) + "\n" for word,count in frequency.most_common(20)])
+
+# for key, text in textbymonth.items():
+#     with open("./output/monthly/"+reddit+"_"+key+".txt","w",encoding="UTF-8") as outfile:
+#         outfile.write(text)

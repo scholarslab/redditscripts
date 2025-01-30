@@ -13,10 +13,11 @@ do a good job of identifying relevant submissions.
 """
 
 REDDITS = ["breastcancer"]
-KEYWORDS = ["flat", "aesthetic closure", "goldilocks", "goldilock"]
+KEYWORDS = [" aesthetic closure", " goldilock", " explant", " flat chest", " aesthetic flat ", " be flat ", " being flat ", " is flat ", " are flat ", " i am flat ", " i'm flat ", " was flat ", " go flat ", " going flat ", " went flat ", " stay flat ", " staying flat ", " stayed flat ", " flat ambassador ", " flat closure ", " flatties ", " years flat ", " year flat ", " remove the implant"," removed the implant", " removing the implant", " remove my implant", " removed my implant", " removing my implant", " post-explant "]
 
-SUBMISSION_COLUMNS = ["subreddit","type","title","author","score","selftext","url","id","permalink","created_utc","date"]
-COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","parent_id","submission_id","submission_title","permalink","created_utc","date"]
+
+SUBMISSION_COLUMNS = ["subreddit","type","title","author","score","selftext","url","id","permalink","created_utc","date", "month"]
+COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","parent_id","submission_id","submission_title","permalink","created_utc","date", "month"]
 
 SAMPLE = False
 
@@ -76,7 +77,7 @@ for reddit in REDDITS:
             j = json.loads(line)
             title = " "+cleanup_pattern.sub(' ', j["title"].lower())+" "
             selftext = " "+cleanup_pattern.sub(' ', j["selftext"].lower())+" "
-            if any([(" "+keyword+" " in selftext or " "+keyword+" " in title) for keyword in KEYWORDS]):
+            if any([(keyword in selftext or keyword in title) for keyword in KEYWORDS]):
                 submission = {}
                 submission["subreddit"] = j["subreddit"]
                 submission["type"] = "submission"
@@ -89,6 +90,7 @@ for reddit in REDDITS:
                 submission["permalink"] = "https://www.reddit.com"+j["permalink"]
                 submission["created_utc"] = j["created_utc"]
                 submission["date"] = datetime.fromtimestamp(int(j["created_utc"])).strftime('%Y-%m-%d')
+                submission["month"] = datetime.fromtimestamp(int(j["created_utc"])).strftime('%Y-%m')
                 submissions[submission["id"]] = submission
             continue
         submission_ids[reddit] = [submission["id"] for submission in submissions.values()]
@@ -97,6 +99,8 @@ for reddit in REDDITS:
         writer.writeheader()
         for submission in submissions.values():
             writer.writerow(submission)
+    with open("./output/"+reddit+"_submissions"+".json","w",encoding="UTF-8") as jsonfile:
+        json.dump(submissions, jsonfile)
 
     if SAMPLE:
         comments_filename = reddit+"_comments_sample"
@@ -128,6 +132,7 @@ for reddit in REDDITS:
                     comment["permalink"] = "NONE"
                 comment["created_utc"] = j["created_utc"]
                 comment["date"] = datetime.fromtimestamp(int(j["created_utc"])).strftime('%Y-%m-%d')
+                comment["month"] = datetime.fromtimestamp(int(j["created_utc"])).strftime('%Y-%m')
                 comments[comment["id"]] = comment
                 comments_by_thread[comment["parent_id"]].append(comment)
             continue
@@ -137,3 +142,5 @@ for reddit in REDDITS:
             for thread_id in comments_by_thread:
                 for comment in comments_by_thread[thread_id]:
                     writer.writerow(comment)
+        with open("./output/"+reddit+"_comments"+".json","w",encoding="UTF-8") as jsonfile:
+            json.dump(comments, jsonfile)
