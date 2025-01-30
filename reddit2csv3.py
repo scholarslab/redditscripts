@@ -14,7 +14,7 @@ KEYWORDS = ["flat", "aesthetic closure", "goldilocks", "goldilock"]
 SUBMISSION_COLUMNS = ["subreddit","type","title","author","score","selftext","url","id","permalink","created_utc","date"]
 COMMENT_COLUMNS = ["subreddit","type","author","score","body","id","permalink","created_utc","date"]
 
-CUSTOM_STOPWORDS = KEYWORDS+["breast", "breasts", "cancer","chest","surgeon","surgery","closure","procedure", "goldilock", "reconstruction","mastectomy","boobs","boobies","boob","implant","implants"]
+CUSTOM_STOPWORDS = KEYWORDS+["breast", "breasts", "cancer","chest","surgeon","surgery","closure","procedure", "reconstruction","mastectomy","boobs","boobies","boob","implant","implants"]
 
 # Reddit API notes
 # 'score' is the total score ('ups' - 'downs') of a post. 'ups' and
@@ -114,9 +114,18 @@ for reddit in REDDITS:
 wordcount = sum([len(y) for x,y in wordsbymonth.items()])
 for month,words in wordsbymonth.items():
     filtered_words = [w.lower() for w in words if not w.lower() in stopwords.words() and not w.lower() in CUSTOM_STOPWORDS]
+    # only filter out nltk basic stopwords and not custom stopwords for ngrams
+    unfiltered_words = [w.lower() for w in words if not w.lower() in stopwords.words()]
     frequency = nltk.FreqDist(filtered_words)
     with open("./output/monthly/freq/"+reddit+"_"+month+".csv","w",encoding="UTF-8") as outfile:
         outfile.writelines([word + ", " + str(count) + "\n" for word,count in frequency.most_common(20)])
+    bigrams = nltk.FreqDist(list(nltk.bigrams(unfiltered_words)))
+    with open("./output/monthly/bigrams/"+reddit+"_"+month+"_bigrams.csv", "w", encoding="UTF-8") as outfile:
+        outfile.writelines([" ".join(bigram) + ", " + str(count) + "\n" for bigram,count in bigrams.most_common(20)])
+    trigrams = nltk.FreqDist(list(nltk.trigrams(unfiltered_words)))
+    with open("./output/monthly/trigrams/"+reddit+"_"+month+"_trigrams.csv", "w", encoding="UTF-8") as outfile:
+        outfile.writelines([" ".join(trigram) + ", " + str(count) + "\n" for trigram,count in trigrams.most_common(20)])
+    
 
 for key in textbymonth.keys():    
     with open("./output/monthly/"+reddit+"_"+key+".txt","w",encoding="UTF-8") as outfile:
